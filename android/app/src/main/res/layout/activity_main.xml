@@ -9,6 +9,8 @@
     tools:context="org.seniorsigan.mnist.MainActivity">
 
     <com.otaliastudios.cameraview.CameraView
+        app:cameraSessionType="picture"
+        app:cameraGrid="draw3x3"
         android:id="@+id/camera"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -36,6 +38,13 @@
         android:layout_width="100dp"
         android:layout_height="100dp"
         android:layout_alignParentBottom="true"
+        android:contentDescription="thumbnail" />
+
+    <ImageView
+        android:id="@+id/preview_origin"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_alignParentTop="true"
         android:contentDescription="thumbnail" />
 
     <TextView

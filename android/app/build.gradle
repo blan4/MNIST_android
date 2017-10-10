@@ -42,6 +42,8 @@ dependencies {
     compile "org.jetbrains.anko:anko-appcompat-v7:$anko_version"
 
     compile 'com.otaliastudios:cameraview:1.2.2'
+    compile 'jp.co.cyberagent.android.gpuimage:gpuimage-library:1.4.1'
+    compile 'com.github.zomato:androidphotofilters:1.0.1'
 
     compile 'org.tensorflow:tensorflow-android:+'
 

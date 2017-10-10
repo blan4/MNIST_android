@@ -86,4 +86,14 @@ public class ImageUtils {
         }
         return resizedBitmap;
     }
+
+    static int getGreyColor(int color) {
+//        final int alpha = color & 0xFF000000;
+        final int r = (color >> 16) & 0xFF;
+        final int g = (color >> 8) & 0xFF;
+        final int b = color & 0xFF;
+
+        // see: https://en.wikipedia.org/wiki/Relative_luminance
+        return (int) (0.2126 * r + 0.7152 * g + 0.0722 * b);
+    }
 }

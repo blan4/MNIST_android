@@ -7,14 +7,16 @@ import tensorflow as tf
 from keras import backend as K
 from keras.datasets import mnist
 from keras.layers import Conv2D, MaxPooling2D
-from keras.layers import Dense, Flatten
+from keras.layers import Dense, Flatten, Dropout
 from keras.models import Sequential
+from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.python.tools import freeze_graph
 from tensorflow.python.tools import optimize_for_inference_lib
 
 MODEL_NAME = 'mnist_convnet'
-EPOCHS = 1
+EPOCHS = 10
 BATCH_SIZE = 128
+ITERATIONS = 1000
 
 
 def load_data():
@@ -32,42 +34,52 @@ def load_data():
 
 def build_model():
     model = Sequential()
-    model.add(Conv2D(filters=64, kernel_size=3, strides=1,
+    model.add(Conv2D(filters=16, kernel_size=5, strides=1,
                      padding='same', activation='relu',
                      input_shape=[28, 28, 1]))
     # 28*28*64
     model.add(MaxPooling2D(pool_size=2, strides=2, padding='same'))
     # 14*14*64
 
-    model.add(Conv2D(filters=128, kernel_size=3, strides=1,
+    model.add(Conv2D(filters=32, kernel_size=4, strides=1,
                      padding='same', activation='relu'))
     # 14*14*128
     model.add(MaxPooling2D(pool_size=2, strides=2, padding='same'))
     # 7*7*128
 
-    model.add(Conv2D(filters=256, kernel_size=3, strides=1,
+    model.add(Conv2D(filters=64, kernel_size=3, strides=1,
                      padding='same', activation='relu'))
     # 7*7*256
     model.add(MaxPooling2D(pool_size=2, strides=2, padding='same'))
     # 4*4*256
 
     model.add(Flatten())
-    model.add(Dense(1024, activation='relu'))
-    # model.add(Dropout(0.5))
+    model.add(Dense(64 * 4, activation='relu'))
     model.add(Dense(10, activation='softmax'))
     return model
 
 
 def train(model, x_train, y_train, x_test, y_test):
+    gen = ImageDataGenerator(rotation_range=8, width_shift_range=0.08, shear_range=0.3,
+                             height_shift_range=0.08, zoom_range=0.08, featurewise_center=True,
+                             featurewise_std_normalization=True)
+    test_gen = ImageDataGenerator()
+
+    gen.fit(x_train)
+
+    train_generator = gen.flow(x_train, y_train, batch_size=BATCH_SIZE)
+    test_generator = test_gen.flow(x_test, y_test, batch_size=BATCH_SIZE)
+
     model.compile(loss=keras.losses.categorical_crossentropy,
-                  optimizer=keras.optimizers.Adadelta(),
+                  optimizer=keras.optimizers.Adam(),
                   metrics=['accuracy'])
 
-    model.fit(x_train, y_train,
-              batch_size=BATCH_SIZE,
-              epochs=EPOCHS,
-              verbose=1,
-              validation_data=(x_test, y_test))
+    model.fit_generator(train_generator,
+                        steps_per_epoch=ITERATIONS,
+                        epochs=EPOCHS,
+                        verbose=1,
+                        validation_steps=100,
+                        validation_data=test_generator)
 
 
 def export_model(saver, model, input_node_names, output_node_name):

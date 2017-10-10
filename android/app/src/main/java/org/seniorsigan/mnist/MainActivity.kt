@@ -22,12 +22,14 @@ class MainActivity : AppCompatActivity() {
     private var classifier: Classifier? = null
     private lateinit var cameraView: CameraView
     private lateinit var preview: ImageView
+    private lateinit var previewOrigin: ImageView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         val text: TextView = findViewById(R.id.prediction)
+        previewOrigin = findViewById(R.id.preview_origin)
         preview = findViewById(R.id.preview)
         cameraView = findViewById(R.id.camera)
         cameraView.mapGesture(Gesture.PINCH, GestureAction.ZOOM)
@@ -36,9 +38,13 @@ class MainActivity : AppCompatActivity() {
             override fun onPictureTaken(jpeg: ByteArray?) {
                 Log.i(TAG, "Photo captured of size: ${jpeg?.size}")
                 CameraUtils.decodeBitmap(jpeg, { bitmap ->
-                    val prediction = classifier?.recognize(getPixels(bitmap))
-                    text.text = "${prediction?.label} ${prediction?.conf}"
-                    Log.i(TAG, "Predicted class $prediction")
+                    getPixels(bitmap, { pixels ->
+                        val prediction = classifier?.recognize(pixels)
+                        runOnUiThread {
+                            text.text = "${prediction?.label} ${prediction?.conf}"
+                        }
+                        Log.i(TAG, "Predicted class $prediction")
+                    })
                 })
             }
         })
@@ -51,41 +57,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getPixels(bitmap: Bitmap): FloatArray {
+    private fun getPixels(bitmap: Bitmap, callback: (FloatArray) -> Unit) {
         Log.i(TAG, "Photo shape: ${bitmap.height}x${bitmap.width}")
-        val wh = if (bitmap.width > bitmap.height) {
-            bitmap.height
-        } else {
-            bitmap.width
-        }
-        val bitmapResized = Bitmap.createScaledBitmap(bitmap, wh, wh, true)
-        val bitmapScaled = ImageUtils.getScaledDownBitmap(bitmapResized, width, false)
-        Log.i(TAG, "Scaled Photo shape: ${bitmapScaled.height}x${bitmapScaled.width}")
+        ImageConverter.prepare(bitmap, width, applicationContext, { bitmapScaled ->
+            val pixels = IntArray(width * height)
+            bitmapScaled.getPixels(pixels, 0, width, 0, 0, width, height)
 
-        val pixels = IntArray(width * height)
-        bitmapScaled.getPixels(pixels, 0, width, 0, 0, width, height)
-
-        val p = pixels.map { pix ->
-            val b = Color.red(pix) * 0.299f + Color.green(pix) * 0.587f + Color.blue(pix) * 0.114f
-            val c = ((b / 255f) * -1f) + 1f
-            if (c < 0.45) {
-                0f
-            } else {
-                c
+            runOnUiThread {
+                previewOrigin.setImageBitmap(bitmapScaled)
             }
-        }.toFloatArray()
 
-        Log.d(TAG, p.joinToString(","))
+            val p = ImageConverter.normalize(pixels)
 
-        Log.d(TAG, "Update preview")
-        bitmapScaled.setPixels(p.map {
-            val c = (it * 255).toInt()
-            Color.argb(0, c, c, c)
-        }.toIntArray(), 0, width, 0, 0, width, height)
+            Log.d(TAG, p.joinToString(","))
 
-        preview.setImageBitmap(bitmapScaled)
+            Log.d(TAG, "Update preview")
 
-        return p
+            val tmpBitmap = Bitmap.createBitmap(bitmapScaled)
+            tmpBitmap.setPixels(p.map {
+                val c = (it * 255).toInt()
+                Color.argb(0, c, c, c)
+            }.toIntArray(), 0, width, 0, 0, width, height)
+
+            runOnUiThread {
+                preview.setImageBitmap(tmpBitmap)
+            }
+
+            callback(p)
+        })
     }
 
     override fun onResume() {
