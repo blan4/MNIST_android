@@ -1,81 +1,59 @@
 # -*- coding: utf-8 -*-
+import os
+
+import tensorflow as tf
 from keras import backend as K
+from keras import metrics
 from keras.callbacks import TensorBoard
-from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Lambda
+from keras.layers import Conv2D, MaxPooling2D, UpSampling2D
 from keras.models import Sequential
 from keras.optimizers import Adadelta
 
-from data import load_data
+from data import load_noise_data
+from exporter import export_model
 
 
 def build_model():
-    """
-    Build convolution autoencoder
-    :return:
-    :rtype Sequential:
-    """
-
     model = Sequential([
-        noise_layer(
-            input_shape=[28, 28, 1],
-            noise_factor=0.5),
+        # 28*28*1
 
         # Encoder
-        # 28*28*1
         Conv2D(
-            filters=16,
+            input_shape=[28, 28, 1],
+            filters=32,
             kernel_size=(3, 3),
             activation='relu',
             padding='same'),
         MaxPooling2D(
             pool_size=(2, 2),
             padding='same'),
-        # 14*14*16
+        # 14*14*32
 
         Conv2D(
-            filters=8,
+            filters=32,
             kernel_size=(3, 3),
             activation='relu',
             padding='same'),
         MaxPooling2D(
             pool_size=(2, 2),
             padding='same'),
-        # 7*7*8
-
-        Conv2D(
-            filters=8,
-            kernel_size=(3, 3),
-            activation='relu',
-            padding='same'),
-        MaxPooling2D(
-            pool_size=(2, 2),
-            padding='same'),
-        # 4*4*8
+        # 7*7*32
 
         # Decoder
         Conv2D(
-            filters=8,
+            filters=32,
             kernel_size=(3, 3),
             activation='relu',
             padding='same'),
         UpSampling2D(
             size=(2, 2)),
-        # 8*8*8
+        # 8*8*32
 
         Conv2D(
-            filters=8,
+            filters=32,
             kernel_size=(3, 3),
             activation='relu',
             padding='same'),
-        UpSampling2D(
-            size=(2, 2)),
-        # 16*16*8
-
-        Conv2D(
-            filters=16,
-            kernel_size=(3, 3),
-            activation='relu',
-            padding='valid'),
         UpSampling2D(
             size=(2, 2)),
         # 32*32*16
@@ -89,49 +67,44 @@ def build_model():
     ])
 
     model.summary()
+    model.compile(optimizer=Adadelta(),
+                  loss=K.binary_crossentropy,
+                  metrics=[metrics.binary_accuracy])
     return model
 
 
-def train(model, x_train, y_train, x_test, y_test):
-    """
+def train(model, x_train, y_train, x_test, y_test, epochs=50, batch_size=128):
+    # gen = ImageDataGenerator(rotation_range=8, width_shift_range=0.08, shear_range=0.3,
+    #                          height_shift_range=0.08, zoom_range=0.08)
+    # test_gen = ImageDataGenerator()
+    # gen.fit(x_train)
+    #
+    # train_generator = gen.flow(x_train, y_train, batch_size=batch_size)
+    # test_generator = test_gen.flow(x_test, y_test, batch_size=batch_size)
 
-    :param model:
-    :type model: Sequential
-    :param x_train:
-    :param y_train:
-    :param x_test:
-    :param y_test:
-    :return:
-    """
-    model.compile(optimizer=Adadelta(), loss=K.binary_crossentropy)
-    model.fit(x=x_train,
-              y=x_train,
-              epochs=50,
-              batch_size=128,
+    model.fit(x=x_train, y=y_train,
+              epochs=epochs,
+              batch_size=batch_size,
               shuffle=True,
-              validation_data=(x_test, x_test),
+              validation_data=(x_test, y_test),
               callbacks=[TensorBoard(
                   log_dir="/tmp/tensorflow/autoencoder",
                   write_images=False,
                   histogram_freq=0,
-                  batch_size=128
+                  batch_size=batch_size
               )])
 
 
-def noise_layer(input_shape, noise_factor=0.5):
-    def add_noise(x):
-        return K.clip(x + K.random_normal(
-            shape=K.shape(x),
-            mean=0.5,
-            stddev=noise_factor), min_value=0., max_value=1.)
-
-    return Lambda(add_noise, name='noiser', input_shape=input_shape)
-
-
 def main():
-    x_train, y_train, x_test, y_test = load_data()
+    x_train, x_train_noisy, _, x_test, x_test_noisy, _ = load_noise_data()
     model = build_model()
-    train(model, x_train, y_train, x_test, y_test)
+    train(model, x_train_noisy, x_train, x_test_noisy, x_test, epochs=10)
+
+    if not os.path.exists('out'):
+        os.mkdir('out')
+
+    export_model(tf.train.Saver(), ["conv2d_1_input"], ["conv2d_5/Sigmoid"], "mnist_autoencoder")
+    model.save("out/autoencoder.h5")
 
 
 if __name__ == '__main__':
