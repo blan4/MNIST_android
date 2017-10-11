@@ -1,8 +1,8 @@
 package org.seniorsigan.mnist
 
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
 import android.support.design.widget.FloatingActionButton
 import android.support.v7.app.AppCompatActivity
 import android.util.Log
@@ -10,6 +10,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.otaliastudios.cameraview.*
 import org.seniorsigan.mnist.classifier.Classifier
+import org.seniorsigan.mnist.classifier.TensorFlowAutoencoder
 import org.seniorsigan.mnist.classifier.TensorFlowClassifier
 import kotlin.concurrent.thread
 
@@ -20,18 +21,22 @@ class MainActivity : AppCompatActivity() {
     private val height = PIXEL_WIDTH
     private val TAG = "MNIST"
     private var classifier: Classifier? = null
+    private var autoencoder: TensorFlowAutoencoder? = null
     private lateinit var cameraView: CameraView
     private lateinit var preview: ImageView
     private lateinit var previewOrigin: ImageView
+    private lateinit var previewAutoencoder: ImageView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         val text: TextView = findViewById(R.id.prediction)
+        previewAutoencoder = findViewById(R.id.preview_autoencoder)
         previewOrigin = findViewById(R.id.preview_origin)
         preview = findViewById(R.id.preview)
         cameraView = findViewById(R.id.camera)
+        cameraView.zoom = 0.6f
         cameraView.mapGesture(Gesture.PINCH, GestureAction.ZOOM)
         cameraView.mapGesture(Gesture.TAP, GestureAction.FOCUS_WITH_MARKER)
         cameraView.addCameraListener(object : CameraListener() {
@@ -41,7 +46,7 @@ class MainActivity : AppCompatActivity() {
                     getPixels(bitmap, { pixels ->
                         val prediction = classifier?.recognize(pixels)
                         runOnUiThread {
-                            text.text = "${prediction?.label} ${prediction?.conf}"
+                            text.text = "${prediction?.label}\n${prediction?.proba}"
                         }
                         Log.i(TAG, "Predicted class $prediction")
                     })
@@ -50,6 +55,18 @@ class MainActivity : AppCompatActivity() {
         })
 
         loadModel()
+
+//        val h = Handler()
+//        h.postDelayed(object : Runnable {
+//            override fun run() {
+//                try {
+//                    cameraView.captureSnapshot()
+//                } catch (e: Exception) {
+//                    Log.e(TAG, "Can't take a photo", e)
+//                }
+//                h.postDelayed(this, 300)
+//            }
+//        }, 300)
 
         val btn: FloatingActionButton = findViewById(R.id.take_picture)
         btn.setOnClickListener {
@@ -63,27 +80,23 @@ class MainActivity : AppCompatActivity() {
             val pixels = IntArray(width * height)
             bitmapScaled.getPixels(pixels, 0, width, 0, 0, width, height)
 
+            val norm = ImageConverter.normalize(pixels)
+
+            val bs = ImageConverter.pixelsToBitmap(norm, width, height, bitmapScaled)
             runOnUiThread {
-                previewOrigin.setImageBitmap(bitmapScaled)
+                previewOrigin.setImageBitmap(bs)
             }
 
-            val p = ImageConverter.normalize(pixels)
+            val clearPixels = autoencoder?.transform(norm)
 
-            Log.d(TAG, p.joinToString(","))
+            if (clearPixels != null) {
+                val bc = ImageConverter.pixelsToBitmap(clearPixels, width, height, bitmapScaled)
+                runOnUiThread {
+                    previewAutoencoder.setImageBitmap(bc)
+                }
 
-            Log.d(TAG, "Update preview")
-
-            val tmpBitmap = Bitmap.createBitmap(bitmapScaled)
-            tmpBitmap.setPixels(p.map {
-                val c = (it * 255).toInt()
-                Color.argb(0, c, c, c)
-            }.toIntArray(), 0, width, 0, 0, width, height)
-
-            runOnUiThread {
-                preview.setImageBitmap(tmpBitmap)
+                callback(clearPixels)
             }
-
-            callback(p)
         })
     }
 
@@ -108,6 +121,9 @@ class MainActivity : AppCompatActivity() {
                     assets, "Keras", "opt_mnist_convnet.pb",
                     PIXEL_WIDTH.toLong(), "conv2d_1_input", "dense_2/Softmax",
                     false)
+            autoencoder = TensorFlowAutoencoder(
+                    assets, "opt_mnist_autoencoder.pb",
+                    PIXEL_WIDTH.toLong(), "conv2d_1_input", "conv2d_5/Sigmoid")
         }
     }
 }

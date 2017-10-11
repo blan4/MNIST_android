@@ -47,11 +47,22 @@
         android:layout_alignParentTop="true"
         android:contentDescription="thumbnail" />
 
+    <ImageView
+        android:id="@+id/preview_autoencoder"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:contentDescription="thumbnail" />
+
     <TextView
-        android:textAppearance="?android:attr/textAppearanceMedium"
         android:id="@+id/prediction"
         android:layout_width="100dp"
         android:layout_height="100dp"
         android:layout_alignParentBottom="true"
-        android:layout_alignParentEnd="true" />
+        android:layout_alignParentEnd="true"
+        android:background="@android:color/black"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:textColor="@android:color/white"
+        android:textSize="30sp" />
 </RelativeLayout>

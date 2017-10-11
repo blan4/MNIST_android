@@ -2,6 +2,7 @@ package org.seniorsigan.mnist
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.util.Log
 import com.zomato.photofilters.imageprocessors.Filter
 import com.zomato.photofilters.imageprocessors.subfilters.BrightnessSubfilter
@@ -16,15 +17,21 @@ object ImageConverter {
         System.loadLibrary("NativeImageProcessor")
     }
 
+    fun pixelsToBitmap(pixels: FloatArray, width: Int, height: Int, origin: Bitmap): Bitmap {
+        val tmpBitmap = Bitmap.createBitmap(origin)
+        tmpBitmap.setPixels(pixels.map {
+            val c = (it * 255).toInt()
+            Color.argb(0, c, c, c)
+        }.toIntArray(), 0, width, 0, 0, width, height)
+        Log.d(TAG, "Pixels converted to Bitmap")
+        return tmpBitmap
+    }
+
     fun normalize(pixels: IntArray): FloatArray {
         return pixels.map { pix ->
             val b = ImageUtils.getGreyColor(pix)
-            val c = ((b / 255f) * -1f) + 1f // invert colors
-            when {
-                c < 0.2 -> 0f
-                c < 0.65 -> 0f
-                else -> 1f
-            }
+            ((b / 255f) * -1f) + 1f // invert colors
+
         }.toFloatArray()
     }
 
@@ -57,8 +64,8 @@ object ImageConverter {
     private fun filters(bitmap: Bitmap): Bitmap {
         val filter = Filter()
         filter.addSubFilter(BrightnessSubfilter(30))
-        filter.addSubFilter(ContrastSubfilter(1.5f))
-        filter.addSubFilter(SaturationSubfilter(1.3f))
+        filter.addSubFilter(ContrastSubfilter(2f))
+        filter.addSubFilter(SaturationSubfilter(2f))
         return filter.processFilter(bitmap)
     }
 }
