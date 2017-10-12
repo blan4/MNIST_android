@@ -18,7 +18,7 @@ def load_data():
     return x_train, y_train, x_test, y_test
 
 
-def load_noise_data(noise_factor=0.6):
+def load_noise_data(noise_factor=0.5):
     x_train, y_train, x_test, y_test = load_data()
 
     x_train_noisy = x_train + noise_factor * np.random.normal(loc=0.0, scale=1.0, size=x_train.shape)

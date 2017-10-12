@@ -63,9 +63,9 @@ object ImageConverter {
 
     private fun filters(bitmap: Bitmap): Bitmap {
         val filter = Filter()
-        filter.addSubFilter(BrightnessSubfilter(30))
-        filter.addSubFilter(ContrastSubfilter(2f))
-        filter.addSubFilter(SaturationSubfilter(2f))
+        filter.addSubFilter(BrightnessSubfilter(20))
+        filter.addSubFilter(ContrastSubfilter(1.5f))
+        filter.addSubFilter(SaturationSubfilter(1.5f))
         return filter.processFilter(bitmap)
     }
 }

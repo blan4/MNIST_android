@@ -8,6 +8,7 @@ from keras.callbacks import TensorBoard
 from keras.layers import Conv2D, MaxPooling2D, UpSampling2D
 from keras.models import Sequential
 from keras.optimizers import Adadelta
+from keras.preprocessing.image import ImageDataGenerator
 
 from data import load_noise_data
 from exporter import export_model
@@ -74,14 +75,6 @@ def build_model():
 
 
 def train(model, x_train, y_train, x_test, y_test, epochs=50, batch_size=128):
-    # gen = ImageDataGenerator(rotation_range=8, width_shift_range=0.08, shear_range=0.3,
-    #                          height_shift_range=0.08, zoom_range=0.08)
-    # test_gen = ImageDataGenerator()
-    # gen.fit(x_train)
-    #
-    # train_generator = gen.flow(x_train, y_train, batch_size=batch_size)
-    # test_generator = test_gen.flow(x_test, y_test, batch_size=batch_size)
-
     model.fit(x=x_train, y=y_train,
               epochs=epochs,
               batch_size=batch_size,
@@ -89,16 +82,38 @@ def train(model, x_train, y_train, x_test, y_test, epochs=50, batch_size=128):
               validation_data=(x_test, y_test),
               callbacks=[TensorBoard(
                   log_dir="/tmp/tensorflow/autoencoder",
-                  write_images=False,
-                  histogram_freq=0,
+                  write_images=True,
+                  histogram_freq=5,
                   batch_size=batch_size
               )])
+
+
+def train_with_augmentation(model, x_train, y_train, x_test, y_test, epochs=50, batch_size=128):
+    gen = ImageDataGenerator(rotation_range=10, width_shift_range=0.08, shear_range=0.3,
+                             height_shift_range=0.08, zoom_range=0.3)
+    test_gen = ImageDataGenerator()
+    gen.fit(x_train)
+
+    train_generator = gen.flow(x_train, y_train, batch_size=batch_size)
+    test_generator = test_gen.flow(x_test, y_test, batch_size=batch_size)
+
+    model.fit_generator(train_generator,
+                        steps_per_epoch=500,
+                        epochs=epochs,
+                        validation_steps=50,
+                        validation_data=test_generator,
+                        callbacks=[TensorBoard(
+                            log_dir="/tmp/tensorflow/autoencoder",
+                            write_images=True,
+                            histogram_freq=0,
+                            batch_size=batch_size
+                        )])
 
 
 def main():
     x_train, x_train_noisy, _, x_test, x_test_noisy, _ = load_noise_data()
     model = build_model()
-    train(model, x_train_noisy, x_train, x_test_noisy, x_test, epochs=10)
+    train(model, x_train_noisy, x_train, x_test_noisy, x_test, epochs=50)
 
     if not os.path.exists('out'):
         os.mkdir('out')
